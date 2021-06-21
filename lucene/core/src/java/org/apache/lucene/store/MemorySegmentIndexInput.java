@@ -27,7 +27,6 @@ import jdk.incubator.foreign.MemoryCopy;
 import jdk.incubator.foreign.MemoryHandles;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
-import sun.misc.Unsafe;
 
 /**
  * Base IndexInput implementation that uses an array of MemorySegments to represent a file.
@@ -45,8 +44,6 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
       MemoryHandles.varHandle(int.class, 1L, ByteOrder.LITTLE_ENDIAN).withInvokeExactBehavior();
   static final VarHandle VH_getLong =
       MemoryHandles.varHandle(long.class, 1L, ByteOrder.LITTLE_ENDIAN).withInvokeExactBehavior();
-
-  static final boolean IS_LITTLE_ENDIAN = (ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN);
 
   final boolean isClone;
   final long length;
@@ -198,7 +195,6 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
     }
   }
 
-  /*
   @Override
   public void readLongs(long[] dst, int offset, int length) throws IOException {
     try {
@@ -226,7 +222,6 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
       throw wrapAlreadyClosedException(e);
     }
   }
-  */
 
   @Override
   public final short readShort() throws IOException {
