@@ -23,6 +23,7 @@ import java.lang.reflect.Field;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Objects;
+import jdk.incubator.foreign.MemoryCopy;
 import jdk.incubator.foreign.MemoryHandles;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
@@ -160,36 +161,11 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   }
   */
   
-  private static long copySegmentToHeap(MemorySegment src, long srcOffset, byte[] target, int targetOffset, int len) {
-    /*Objects.checkFromIndexSize(srcOffset, len, src.byteSize());
-    theUnsafe.copyMemory(null, src.address().toRawLongValue() + srcOffset, 
-        target, Unsafe.ARRAY_BYTE_BASE_OFFSET + targetOffset, len);
-    */MemorySegment.ofArray(target).asSlice(targetOffset, len).copyFrom(src.asSlice(srcOffset, len));
-    return len;
-  }
-
-  private static long copySegmentToHeap(MemorySegment src, long srcOffset, long[] target, int targetOffset, int len) {
-    final long bytesLen = (long) len << 3;
-    /*Objects.checkFromIndexSize(srcOffset, bytesLen, src.byteSize());
-    theUnsafe.copyMemory(null, src.address().toRawLongValue() + srcOffset,
-        target, Unsafe.ARRAY_LONG_BASE_OFFSET + ((long) targetOffset << 3), bytesLen);
-    */MemorySegment.ofArray(target).asSlice((long) targetOffset << 3, bytesLen).copyFrom(src.asSlice(srcOffset, bytesLen));
-    return bytesLen;
-  }
-
-  private static long copySegmentToHeap(MemorySegment src, long srcOffset, float[] target, int targetOffset, int len) {
-    final long bytesLen = (long) len << 2;
-    /*Objects.checkFromIndexSize(srcOffset, bytesLen, src.byteSize());
-    theUnsafe.copyMemory(null, src.address().toRawLongValue() + srcOffset,
-        target, Unsafe.ARRAY_FLOAT_BASE_OFFSET + ((long) targetOffset << 2), bytesLen);
-    */MemorySegment.ofArray(target).asSlice((long) targetOffset << 2, bytesLen).copyFrom(src.asSlice(srcOffset, bytesLen));
-    return bytesLen;
-  }
-
   @Override
   public final void readBytes(byte[] b, int offset, int len) throws IOException {
     try {
-      curPosition += copySegmentToHeap(curSegment, curPosition, b, offset, len);
+      MemoryCopy.copyToArray(curSegment, curPosition, b, offset, len);
+      curPosition += len;
     } catch (
         @SuppressWarnings("unused")
         IndexOutOfBoundsException e) {
@@ -204,7 +180,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
     try {
       long curAvail = curSegment.byteSize() - curPosition;
       while (len > curAvail) {
-        copySegmentToHeap(curSegment, curPosition, b, offset, (int) curAvail);
+        MemoryCopy.copyToArray(curSegment, curPosition, b, offset, (int) curAvail);
         len -= curAvail;
         offset += curAvail;
         curSegmentIndex++;
@@ -215,7 +191,8 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
         curPosition = 0L;
         curAvail = curSegment.byteSize();
       }
-      curPosition += copySegmentToHeap(curSegment, curPosition, b, offset, len);
+      MemoryCopy.copyToArray(curSegment, curPosition, b, offset, len);
+      curPosition += len;
     } catch (NullPointerException | IllegalStateException e) {
       throw wrapAlreadyClosedException(e);
     }
@@ -223,35 +200,29 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
 
   @Override
   public void readLongs(long[] dst, int offset, int length) throws IOException {
-    if (IS_LITTLE_ENDIAN) {
-      try {
-        curPosition += copySegmentToHeap(curSegment, curPosition, dst, offset, length);
-      } catch (
-          @SuppressWarnings("unused")
-          IndexOutOfBoundsException iobe) {
-        super.readLongs(dst, offset, length);
-      } catch (NullPointerException | IllegalStateException e) {
-        throw wrapAlreadyClosedException(e);
-      }
-    } else {
+    try {
+      MemoryCopy.copyToArray(curSegment, curPosition, dst, offset, length, ByteOrder.LITTLE_ENDIAN);
+      curPosition += Long.BYTES * (long) length;
+    } catch (
+        @SuppressWarnings("unused")
+        IndexOutOfBoundsException iobe) {
       super.readLongs(dst, offset, length);
+    } catch (NullPointerException | IllegalStateException e) {
+      throw wrapAlreadyClosedException(e);
     }
   }
 
   @Override
   public void readFloats(float[] dst, int offset, int length) throws IOException {
-    if (IS_LITTLE_ENDIAN) {
-      try {
-        curPosition += copySegmentToHeap(curSegment, curPosition, dst, offset, length);
-      } catch (
-          @SuppressWarnings("unused")
-          IndexOutOfBoundsException iobe) {
-        super.readFloats(dst, offset, length);
-      } catch (NullPointerException | IllegalStateException e) {
-        throw wrapAlreadyClosedException(e);
-      }
-    } else {
+    try {
+      MemoryCopy.copyToArray(curSegment, curPosition, dst, offset, length, ByteOrder.LITTLE_ENDIAN);
+      curPosition += Float.BYTES * (long) length;
+    } catch (
+        @SuppressWarnings("unused")
+        IndexOutOfBoundsException iobe) {
       super.readFloats(dst, offset, length);
+    } catch (NullPointerException | IllegalStateException e) {
+      throw wrapAlreadyClosedException(e);
     }
   }
 
