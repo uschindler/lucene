@@ -198,6 +198,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
     }
   }
 
+  /*
   @Override
   public void readLongs(long[] dst, int offset, int length) throws IOException {
     try {
@@ -225,6 +226,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
       throw wrapAlreadyClosedException(e);
     }
   }
+  */
 
   @Override
   public final short readShort() throws IOException {
