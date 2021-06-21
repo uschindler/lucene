@@ -145,19 +145,6 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
     }
   }
   
-  /*
-  private static final Unsafe theUnsafe;
-  static {
-    try {
-      Field f = Unsafe.class.getDeclaredField("theUnsafe");
-      f.setAccessible(true);
-      theUnsafe = (Unsafe) f.get(null);
-    } catch (ReflectiveOperationException e) {
-      throw new RuntimeException(e);
-    }
-  }
-  */
-  
   @Override
   public final void readBytes(byte[] b, int offset, int len) throws IOException {
     try {
