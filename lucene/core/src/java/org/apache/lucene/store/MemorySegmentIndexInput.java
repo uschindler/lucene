@@ -148,7 +148,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   @Override
   public final void readBytes(byte[] b, int offset, int len) throws IOException {
     try {
-      MemoryAccess.readBytes(curSegment, curPosition, b, offset, len);
+      MemoryAccess.copy(curSegment, curPosition, b, offset, len);
       curPosition += len;
     } catch (
         @SuppressWarnings("unused")
@@ -164,7 +164,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
     try {
       long curAvail = curSegment.byteSize() - curPosition;
       while (len > curAvail) {
-        MemoryAccess.readBytes(curSegment, curPosition, b, offset, (int) curAvail);
+        MemoryAccess.copy(curSegment, curPosition, b, offset, (int) curAvail);
         len -= curAvail;
         offset += curAvail;
         curSegmentIndex++;
@@ -175,7 +175,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
         curPosition = 0L;
         curAvail = curSegment.byteSize();
       }
-      MemoryAccess.readBytes(curSegment, curPosition, b, offset, len);
+      MemoryAccess.copy(curSegment, curPosition, b, offset, len);
       curPosition += len;
     } catch (NullPointerException | IllegalStateException e) {
       throw wrapAlreadyClosedException(e);
@@ -185,7 +185,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   @Override
   public void readLongs(long[] dst, int offset, int length) throws IOException {
     try {
-      MemoryAccess.readLongs(curSegment, curPosition, dst, offset, length, ByteOrder.LITTLE_ENDIAN);
+      MemoryAccess.copy(curSegment, curPosition, dst, offset, length, ByteOrder.LITTLE_ENDIAN);
       curPosition += Long.BYTES * (long) length;
     } catch (
         @SuppressWarnings("unused")
@@ -199,7 +199,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   @Override
   public void readFloats(float[] dst, int offset, int length) throws IOException {
     try {
-      MemoryAccess.readFloats(curSegment, curPosition, dst, offset, length, ByteOrder.LITTLE_ENDIAN);
+      MemoryAccess.copy(curSegment, curPosition, dst, offset, length, ByteOrder.LITTLE_ENDIAN);
       curPosition += Float.BYTES * (long) length;
     } catch (
         @SuppressWarnings("unused")
