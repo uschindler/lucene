@@ -19,7 +19,6 @@ package org.apache.lucene.store;
 import java.io.EOFException;
 import java.io.IOException;
 import java.lang.invoke.VarHandle;
-import java.lang.reflect.Field;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Objects;
@@ -45,7 +44,6 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   static final VarHandle VH_getLong =
       MemoryHandles.varHandle(long.class, 1L, ByteOrder.LITTLE_ENDIAN).withInvokeExactBehavior();
 
-  final boolean isClone;
   final long length;
   final long chunkSizeMask;
   final int chunkSizePower;
@@ -63,12 +61,11 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
       MemorySegment[] segments,
       long length,
       int chunkSizePower) {
+    assert Arrays.stream(segments).map(MemorySegment::scope).allMatch(scope::equals);
     if (segments.length == 1) {
-      return new SingleSegmentImpl(
-          resourceDescription, scope, segments[0], length, chunkSizePower, false);
+      return new SingleSegmentImpl(resourceDescription, scope, segments[0], length, chunkSizePower);
     } else {
-      return new MultiSegmentImpl(
-          resourceDescription, scope, segments, 0, length, chunkSizePower, false);
+      return new MultiSegmentImpl(resourceDescription, scope, segments, 0, length, chunkSizePower);
     }
   }
 
@@ -77,16 +74,13 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
       ResourceScope scope,
       MemorySegment[] segments,
       long length,
-      int chunkSizePower,
-      boolean isClone) {
+      int chunkSizePower) {
     super(resourceDescription);
     this.scope = scope;
     this.segments = segments;
-    assert Arrays.stream(segments).map(MemorySegment::scope).allMatch(scope::equals);
     this.length = length;
     this.chunkSizePower = chunkSizePower;
     this.chunkSizeMask = (1L << chunkSizePower) - 1L;
-    this.isClone = isClone;
     this.curSegment = segments[0];
   }
 
@@ -159,8 +153,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
     }
   }
 
-  private void readBytesBoundary(byte[] b, int offset, int len)
-      throws IOException {
+  private void readBytesBoundary(byte[] b, int offset, int len) throws IOException {
     try {
       long curAvail = curSegment.byteSize() - curPosition;
       while (len > curAvail) {
@@ -422,30 +415,37 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
     if (slices.length == 1) {
       return new SingleSegmentImpl(
           newResourceDescription,
-          scope,
+          null, // clones don't have a resource scope, as they can't close)
           slices[0].asSlice(offset, length),
           length,
-          chunkSizePower,
-          true);
+          chunkSizePower);
     } else {
       return new MultiSegmentImpl(
-          newResourceDescription, scope, slices, offset, length, chunkSizePower, true);
+          newResourceDescription,
+          null, // clones don't have a resource scope, as they can't close)
+          slices,
+          offset,
+          length,
+          chunkSizePower);
     }
   }
 
   @Override
   public final void close() throws IOException {
-    if (curSegment == null) return;
+    if (curSegment == null) {
+      return;
+    }
 
-    try {
-      curSegment = null;
-      if (isClone == false) {
-        scope.close();
-      }
-    } finally {
-      // make sure that after close all segments are nulled,
-      // so clones can throw AlreadyClosed on NPE:
-      Arrays.fill(segments, null);
+    // make sure all accesses to this IndexInput instance throw NPE:
+    curSegment = null;
+    Arrays.fill(segments, null);
+
+    // the master IndexInput has a scope and is able
+    // to release all resources (unmap segments) - a
+    // side effect is that other threads still using clones
+    // will throw IllegalStateException
+    if (scope != null) {
+      scope.close();
     }
   }
 
@@ -457,15 +457,8 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
         ResourceScope scope,
         MemorySegment segment,
         long length,
-        int chunkSizePower,
-        boolean isClone) {
-      super(
-          resourceDescription,
-          scope,
-          new MemorySegment[] {segment},
-          length,
-          chunkSizePower,
-          isClone);
+        int chunkSizePower) {
+      super(resourceDescription, scope, new MemorySegment[] {segment}, length, chunkSizePower);
       this.curSegmentIndex = 0;
     }
 
@@ -550,9 +543,8 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
         MemorySegment[] segments,
         long offset,
         long length,
-        int chunkSizePower,
-        boolean isClone) {
-      super(resourceDescription, scope, segments, length, chunkSizePower, isClone);
+        int chunkSizePower) {
+      super(resourceDescription, scope, segments, length, chunkSizePower);
       this.offset = offset;
       try {
         seek(0L);
