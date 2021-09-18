@@ -18,14 +18,13 @@ package org.apache.lucene.store;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Objects;
-import jdk.incubator.foreign.MemoryAccess;
 import jdk.incubator.foreign.MemoryHandles;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
+import jdk.incubator.foreign.ValueLayout;
 
 /**
  * Base IndexInput implementation that uses an array of MemorySegments to represent a file.
@@ -34,15 +33,11 @@ import jdk.incubator.foreign.ResourceScope;
  * chunkSizePower</code>).
  */
 public abstract class MemorySegmentIndexInput extends IndexInput implements RandomAccessInput {
-  // We pass 1L as alignment, because currently Lucene file formats are heavy unaligned: :(
-  static final VarHandle VH_getByte =
-      MemoryHandles.varHandle(byte.class, 1L, ByteOrder.LITTLE_ENDIAN).withInvokeExactBehavior();
-  static final VarHandle VH_getShort =
-      MemoryHandles.varHandle(short.class, 1L, ByteOrder.LITTLE_ENDIAN).withInvokeExactBehavior();
-  static final VarHandle VH_getInt =
-      MemoryHandles.varHandle(int.class, 1L, ByteOrder.LITTLE_ENDIAN).withInvokeExactBehavior();
-  static final VarHandle VH_getLong =
-      MemoryHandles.varHandle(long.class, 1L, ByteOrder.LITTLE_ENDIAN).withInvokeExactBehavior();
+  static final ValueLayout.OfByte LAYOUT_BYTE = ValueLayout.JAVA_BYTE;
+  static final ValueLayout.OfShort LAYOUT_LE_SHORT = ValueLayout.JAVA_SHORT.withOrder(ByteOrder.LITTLE_ENDIAN);
+  static final ValueLayout.OfInt LAYOUT_LE_INT = ValueLayout.JAVA_INT.withOrder(ByteOrder.LITTLE_ENDIAN);
+  static final ValueLayout.OfLong LAYOUT_LE_LONG = ValueLayout.JAVA_LONG.withOrder(ByteOrder.LITTLE_ENDIAN);
+  static final ValueLayout.OfFloat LAYOUT_LE_FLOAT = ValueLayout.JAVA_FLOAT.withOrder(ByteOrder.LITTLE_ENDIAN);
 
   final long length;
   final long chunkSizeMask;
@@ -117,7 +112,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   @Override
   public final byte readByte() throws IOException {
     try {
-      final byte v = (byte) VH_getByte.get(curSegment, curPosition);
+      final byte v = curSegment.get(LAYOUT_BYTE, curPosition);
       curPosition++;
       return v;
     } catch (
@@ -131,7 +126,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
         curSegment = segments[curSegmentIndex];
         curPosition = 0L;
       } while (curSegment.byteSize() == 0L);
-      final byte v = (byte) VH_getByte.get(curSegment, curPosition);
+      final byte v = curSegment.get(LAYOUT_BYTE, curPosition);
       curPosition++;
       return v;
     } catch (NullPointerException | IllegalStateException e) {
@@ -142,7 +137,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   @Override
   public final void readBytes(byte[] b, int offset, int len) throws IOException {
     try {
-      MemoryAccess.copy(curSegment, curPosition, b, offset, len);
+      MemorySegment.copy(curSegment, ValueLayout.JAVA_BYTE, curPosition, b, offset, len);
       curPosition += len;
     } catch (
         @SuppressWarnings("unused")
@@ -157,7 +152,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
     try {
       long curAvail = curSegment.byteSize() - curPosition;
       while (len > curAvail) {
-        MemoryAccess.copy(curSegment, curPosition, b, offset, (int) curAvail);
+        MemorySegment.copy(curSegment, ValueLayout.JAVA_BYTE, curPosition, b, offset, (int) curAvail);
         len -= curAvail;
         offset += curAvail;
         curSegmentIndex++;
@@ -168,7 +163,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
         curPosition = 0L;
         curAvail = curSegment.byteSize();
       }
-      MemoryAccess.copy(curSegment, curPosition, b, offset, len);
+      MemorySegment.copy(curSegment, ValueLayout.JAVA_BYTE, curPosition, b, offset, len);
       curPosition += len;
     } catch (NullPointerException | IllegalStateException e) {
       throw wrapAlreadyClosedException(e);
@@ -178,7 +173,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   @Override
   public void readLongs(long[] dst, int offset, int length) throws IOException {
     try {
-      MemoryAccess.copy(curSegment, curPosition, dst, offset, length, ByteOrder.LITTLE_ENDIAN);
+      MemorySegment.copy(curSegment, LAYOUT_LE_LONG, curPosition, dst, offset, length);
       curPosition += Long.BYTES * (long) length;
     } catch (
         @SuppressWarnings("unused")
@@ -192,7 +187,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   @Override
   public void readFloats(float[] dst, int offset, int length) throws IOException {
     try {
-      MemoryAccess.copy(curSegment, curPosition, dst, offset, length, ByteOrder.LITTLE_ENDIAN);
+      MemorySegment.copy(curSegment, LAYOUT_LE_FLOAT, curPosition, dst, offset, length);
       curPosition += Float.BYTES * (long) length;
     } catch (
         @SuppressWarnings("unused")
@@ -206,7 +201,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   @Override
   public final short readShort() throws IOException {
     try {
-      final short v = (short) VH_getShort.get(curSegment, curPosition);
+      final short v = curSegment.get(LAYOUT_LE_SHORT, curPosition);
       curPosition += Short.BYTES;
       return v;
     } catch (
@@ -221,7 +216,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   @Override
   public final int readInt() throws IOException {
     try {
-      final int v = (int) VH_getInt.get(curSegment, curPosition);
+      final int v = curSegment.get(LAYOUT_LE_INT, curPosition);
       curPosition += Integer.BYTES;
       return v;
     } catch (
@@ -236,7 +231,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   @Override
   public final long readLong() throws IOException {
     try {
-      final long v = (long) VH_getLong.get(curSegment, curPosition);
+      final long v = curSegment.get(LAYOUT_LE_LONG, curPosition);
       curPosition += Long.BYTES;
       return v;
     } catch (
@@ -279,7 +274,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   public byte readByte(long pos) throws IOException {
     try {
       final int si = (int) (pos >> chunkSizePower);
-      return (byte) VH_getByte.get(segments[si], pos & chunkSizeMask);
+      return segments[si].get(LAYOUT_BYTE, pos & chunkSizeMask);
     } catch (
         @SuppressWarnings("unused")
         IndexOutOfBoundsException ioobe) {
@@ -310,7 +305,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   public short readShort(long pos) throws IOException {
     final int si = (int) (pos >> chunkSizePower);
     try {
-      return (short) VH_getShort.get(segments[si], pos & chunkSizeMask);
+      return segments[si].get(LAYOUT_LE_SHORT, pos & chunkSizeMask);
     } catch (
         @SuppressWarnings("unused")
         IndexOutOfBoundsException ioobe) {
@@ -326,7 +321,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   public int readInt(long pos) throws IOException {
     final int si = (int) (pos >> chunkSizePower);
     try {
-      return (int) VH_getInt.get(segments[si], pos & chunkSizeMask);
+      return segments[si].get(LAYOUT_LE_INT, pos & chunkSizeMask);
     } catch (
         @SuppressWarnings("unused")
         IndexOutOfBoundsException ioobe) {
@@ -342,7 +337,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
   public long readLong(long pos) throws IOException {
     final int si = (int) (pos >> chunkSizePower);
     try {
-      return (long) VH_getLong.get(segments[si], pos & chunkSizeMask);
+      return segments[si].get(LAYOUT_LE_LONG, pos & chunkSizeMask);
     } catch (
         @SuppressWarnings("unused")
         IndexOutOfBoundsException ioobe) {
@@ -483,7 +478,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
     @Override
     public byte readByte(long pos) throws IOException {
       try {
-        return (byte) VH_getByte.get(curSegment, pos);
+        return curSegment.get(LAYOUT_BYTE, pos);
       } catch (
           @SuppressWarnings("unused")
           IndexOutOfBoundsException e) {
@@ -496,7 +491,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
     @Override
     public short readShort(long pos) throws IOException {
       try {
-        return (short) VH_getShort.get(curSegment, pos);
+        return curSegment.get(LAYOUT_LE_SHORT, pos);
       } catch (
           @SuppressWarnings("unused")
           IndexOutOfBoundsException e) {
@@ -509,7 +504,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
     @Override
     public int readInt(long pos) throws IOException {
       try {
-        return (int) VH_getInt.get(curSegment, pos);
+        return curSegment.get(LAYOUT_LE_INT, pos);
       } catch (
           @SuppressWarnings("unused")
           IndexOutOfBoundsException e) {
@@ -522,7 +517,7 @@ public abstract class MemorySegmentIndexInput extends IndexInput implements Rand
     @Override
     public long readLong(long pos) throws IOException {
       try {
-        return (long) VH_getLong.get(curSegment, pos);
+        return curSegment.get(LAYOUT_LE_LONG, pos);
       } catch (
           @SuppressWarnings("unused")
           IndexOutOfBoundsException e) {
