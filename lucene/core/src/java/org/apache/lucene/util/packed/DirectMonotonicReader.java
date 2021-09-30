@@ -29,7 +29,7 @@ import org.apache.lucene.util.RamUsageEstimator;
  *
  * @see DirectMonotonicWriter
  */
-public final class DirectMonotonicReader extends LongValues implements Accountable {
+public final class DirectMonotonicReader implements LongValues, Accountable {
 
   private static final long BASE_RAM_BYTES_USED =
       RamUsageEstimator.shallowSizeOfInstance(DirectMonotonicReader.class);

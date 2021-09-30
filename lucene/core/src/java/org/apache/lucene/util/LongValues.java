@@ -21,27 +21,15 @@ package org.apache.lucene.util;
  *
  * @lucene.internal
  */
-public abstract class LongValues {
+@FunctionalInterface
+public interface LongValues {
 
   /** An instance that returns the provided value. */
-  public static final LongValues IDENTITY =
-      new LongValues() {
+  public static final LongValues IDENTITY = index -> index;
 
-        @Override
-        public long get(long index) {
-          return index;
-        }
-      };
-
-  public static final LongValues ZEROES =
-      new LongValues() {
-
-        @Override
-        public long get(long index) {
-          return 0;
-        }
-      };
+  /** An instance that always returns {@code 0L}. */
+  public static final LongValues ZEROES = index -> 0L;
 
   /** Get value at <code>index</code>. */
-  public abstract long get(long index);
+  public long get(long index);
 }

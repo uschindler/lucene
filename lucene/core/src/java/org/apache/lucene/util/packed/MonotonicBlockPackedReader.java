@@ -32,7 +32,7 @@ import org.apache.lucene.util.RamUsageEstimator;
  *
  * @lucene.internal
  */
-public class MonotonicBlockPackedReader extends LongValues implements Accountable {
+public class MonotonicBlockPackedReader implements LongValues, Accountable {
 
   static long expected(long origin, float average, int index) {
     return origin + (long) (average * (long) index);
