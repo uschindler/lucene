@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-/** Test module for {@code org.apache.lucene.analysis.morfologik}. */
+/** Test module for {@code org.apache.lucene.core}. */
 @SuppressWarnings({"requires-automatic"})
 module org.apache.lucene.core.tests {
   requires org.apache.lucene.core;
