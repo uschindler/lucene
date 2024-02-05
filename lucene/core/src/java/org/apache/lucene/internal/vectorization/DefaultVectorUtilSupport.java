@@ -17,6 +17,7 @@
 
 package org.apache.lucene.internal.vectorization;
 
+import org.apache.lucene.util.BitUtil;
 import org.apache.lucene.util.Constants;
 import org.apache.lucene.util.SuppressForbidden;
 
@@ -181,9 +182,15 @@ final class DefaultVectorUtilSupport implements VectorUtilSupport {
 
   @Override
   public int binaryHammingDistance(byte[] a, byte[] b) {
-    int distance = 0;
-    for (int i = 0; i < a.length; i++) {
-      distance += HAMMING_DISTANCE_LOOKUP_TABLE[(a[i] ^ b[i]) & 0xFF];
+    int distance = 0, i = 0;
+    for (int upperBound = a.length & ~(Long.BYTES - 1); i < upperBound; i += Long.BYTES) {
+      distance += Long.bitCount(((long) BitUtil.VH_NATIVE_LONG.get(a, i) ^ (long) BitUtil.VH_NATIVE_LONG.get(b, i)) & 0xFFFFFFFFFFFFFFFFL);
+    }
+    for (int upperBound = a.length & ~(Integer.BYTES - 1); i < upperBound; i += Integer.BYTES) {
+      distance += Integer.bitCount(((int) BitUtil.VH_NATIVE_INT.get(a, i) ^ (int) BitUtil.VH_NATIVE_INT.get(b, i)) & 0xFFFFFFFF);
+    }
+    for (; i < a.length; i++) {
+      distance += Integer.bitCount((a[i] ^ b[i]) & 0xFF);
     }
     return distance;
   }
