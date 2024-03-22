@@ -84,7 +84,8 @@ final class MemorySegmentIndexInputProvider implements MMapDirectory.MMapIndexIn
     }
 
     final OptionalInt advice;
-    if (chunkSizePower < 21) {
+    if (preload || chunkSizePower < 21) {
+      // if preload is true, the advice is ignored
       // if chunk size is too small (2 MiB), disable madvise support (incorrect alignment):
       advice = OptionalInt.empty();
     } else {

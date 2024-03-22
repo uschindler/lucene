@@ -64,7 +64,7 @@ public class IOContext {
 
   public static final IOContext READ = new IOContext(false, false, false);
 
-  public static final IOContext LOAD = new IOContext(false, true, false);
+  public static final IOContext LOAD = new IOContext(false, true, true);
 
   public static final IOContext RANDOM = new IOContext(false, false, true);
 
@@ -89,6 +89,9 @@ public class IOContext {
   private IOContext(boolean readOnce, boolean load, boolean randomAccess) {
     if (readOnce && randomAccess) {
       throw new IllegalArgumentException("cannot be both readOnce and randomAccess");
+    }
+    if (load && randomAccess == false) {
+      throw new IllegalArgumentException("cannot be load but not randomAccess");
     }
     this.context = Context.READ;
     this.mergeInfo = null;
